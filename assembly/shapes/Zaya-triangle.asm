@@ -13,8 +13,8 @@ _start:
 	jmp triangle
 
 triangle:
-	mov eax, 4          ; sys_write in 32-bit
-	mov ebx, 1          ; stdout
+	mov eax, 4
+	mov ebx, 1
 	mov ecx, triangle_msg
 	mov edx, triangle_len
 	int 0x80
@@ -52,8 +52,8 @@ fill_stars:
 	mov edx, edi
 	sub edx, line
 
-	mov eax, 4          ; sys_write
-	mov ebx, 1          ; stdout
+	mov eax, 4
+	mov ebx, 1
 	mov ecx, line
 	int 0x80
 
@@ -64,6 +64,7 @@ finish_triangle:
 	jmp main_menu
 
 main_menu:
-	mov eax, 1          ; sys_exit
+	; Placeholder for mainmenu
+	mov eax, 1
 	mov ebx, 0
 	int 0x80
