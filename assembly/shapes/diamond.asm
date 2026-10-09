@@ -5,11 +5,13 @@
 ; ==========================================
 
 section .data
-    arko_prompt db "Enter diamond size (1-9): ", 0
+    arko_prompt db "Enter diamond size (1-9): "
     arko_prompt_len equ $ - arko_prompt
     arko_star db "* "
     arko_space db "  "
     arko_newline db 10
+    arko_invalid_msg db "Invalid size. Enter a number from 1 to 9.", 10
+    arko_invalid_len equ $ - arko_invalid_msg
 
 section .bss
     arko_param resb 2
@@ -19,30 +21,75 @@ global diamond
 
 diamond:
     ; --- Prompt for size ---
+arko_prompt_size:
     mov rax, 1
     mov rdi, 1
     mov rsi, arko_prompt
     mov rdx, arko_prompt_len
     syscall
 
+    ; --- Prepare to read input ---
 arko_read_input:
-    ; --- Read size input ---
+    xor r8, r8
+    xor r10, r10
+
+    ; --- Read one character at a time ---
+arko_read_char:
     mov rax, 0
     mov rdi, 0
     mov rsi, arko_param
-    mov rdx, 2
+    mov rdx, 1
     syscall
 
-    ; --- Ignore leftover Enter key (Buffer Fix) ---
-    movzx r10, byte [arko_param]
-    cmp r10, 10                 ; 10 is the ASCII code for Enter (\n)
-    je arko_read_input          ; If it is just Enter, loop back and wait for a real number
+    cmp rax, 1
+    jne exit_program
 
-    ; --- Convert ASCII to Integer ---
-    sub r10, '0'                ; Convert character to integer
+    mov al, [arko_param]
 
-    ; --- Top Half ---
-    mov r8, 1               
+    ; Check for Enter
+    cmp al, 10
+    je arko_validate
+
+    ; Count characters
+    inc r8
+
+    ; Save only the first character
+    cmp r8, 1
+    jne arko_read_char
+
+    mov r10b, al
+    jmp arko_read_char
+
+    ; --- Validate input ---
+arko_validate:
+    cmp r8, 1
+    jne arko_invalid
+
+    cmp r10b, '1'
+    jb arko_invalid
+
+    cmp r10b, '9'
+    ja arko_invalid
+
+    ; Convert ASCII to integer
+    sub r10, '0'
+    jmp arko_start_drawing
+
+    ; --- Invalid input ---
+arko_invalid:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, arko_invalid_msg
+    mov rdx, arko_invalid_len
+    syscall
+
+    jmp arko_prompt_size
+
+    ; --- Start drawing diamond ---
+arko_start_drawing:
+    mov r8, 1
+
+    ; --- Top Half ---              
 dia_top_row:
     cmp r8, r10             
     jg dia_bot_init         
