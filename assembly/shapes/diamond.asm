@@ -116,25 +116,31 @@ return_to_main:
 ; Local Helper Subroutines
 ; ==========================================
 arko_print_star:
+    push r11
     mov rax, 1
     mov rdi, 1
     mov rsi, arko_star
-    mov rdx, 2
+    mov rdx, 1
     syscall
+    pop r11
     ret
 
 arko_print_space:
+    push r11
     mov rax, 1
     mov rdi, 1
     mov rsi, arko_space
-    mov rdx, 2
+    mov rdx, 1
     syscall
+    pop r11
     ret
 
 arko_print_newline:
+    push r11
     mov rax, 1
     mov rdi, 1
     mov rsi, arko_newline
     mov rdx, 1
     syscall
+    pop r11
     ret
