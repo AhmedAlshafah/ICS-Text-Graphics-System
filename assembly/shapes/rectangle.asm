@@ -1,112 +1,60 @@
 section .data
-    rect_prompt_w db "Enter rectangle width: ", 0
-    rect_prompt_w_len equ $ - rect_prompt_w
-    
-    rect_prompt_h db "Enter rectangle height: ", 0
-    rect_prompt_h_len equ $ - rect_prompt_h
-    
-    star db "* "
-    newline db 10
-
-section .bss
-    buffer resb 16
-    width  resq 1
-    height resq 1
+    rect_star db "* ", 0
+    rect_newline db 10, 0
 
 section .text
     global rectangle
+    extern main_menu
 
 rectangle:
-    ; --- Prompt for Width ---
-    mov rax, 1                  ; sys_write
-    mov rdi, 1                  ; stdout
-    mov rsi, rect_prompt_w
-    mov rdx, rect_prompt_w_len
-    syscall
+    ; Convert ASCII input in r10 to integer (Height/Size)
+    sub r10, '0'
 
-    ; Read Width
-    mov rax, 0                  ; sys_read
-    mov rdi, 0                  ; stdin
-    mov rsi, buffer
-    mov rdx, 16
-    syscall
+    ; If height <= 0, return immediately
+    cmp r10, 0
+    jle return_to_main
 
-    ; Convert ASCII input in buffer to integer -> store in [width]
-    mov rsi, buffer
-    call ascii_to_int
-    mov [width], rax
+    mov r8, r10         ; r8 = row counter (height)
+    mov r9, r10         ; r9 = column counter (width)
 
-    ; --- Prompt for Height ---
+rect_row_loop:
+    cmp r8, 0
+    jle return_to_main
+
+    mov r11, 0          ; r11 = current column
+
+rect_col_loop:
+    cmp r11, r9
+    jge rect_next_row
+
+    call rect_print_star
+    inc r11
+    jmp rect_col_loop
+
+rect_next_row:
+    call rect_print_newline
+    dec r8
+    jmp rect_row_loop
+
+return_to_main:
+    jmp main_menu
+
+; ===================================================
+; Local Helper Subroutines
+; ===================================================
+
+rect_print_star:
     mov rax, 1
     mov rdi, 1
-    mov rsi, rect_prompt_h
-    mov rdx, rect_prompt_h_len
-    syscall
-
-    ; Read Height
-    mov rax, 0
-    mov rdi, 0
-    mov rsi, buffer
-    mov rdx, 16
-    syscall
-
-    ; Convert ASCII input in buffer to integer -> store in [height]
-    mov rsi, buffer
-    call ascii_to_int
-    mov [height], rax
-
-    ; --- Draw Rectangle Loops ---
-    mov r12, [height]           ; Outer loop counter (rows)
-
-row_loop:
-    cmp r12, 0
-    jle end_rectangle
-
-    mov r13, [width]            ; Inner loop counter (columns)
-
-col_loop:
-    cmp r13, 0
-    jle end_col
-
-    ; Print "* "
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, star
+    mov rsi, rect_star
     mov rdx, 2
     syscall
+    ret
 
-    dec r13
-    jmp col_loop
-
-end_col:
-    ; Print newline at end of row
+rect_print_newline:
     mov rax, 1
     mov rdi, 1
-    mov rsi, newline
+    mov rsi, rect_newline
     mov rdx, 1
     syscall
-
-    dec r12
-    jmp row_loop
-
-end_rectangle:
-    jmp main_menu               ; Return to main menu when finished
-
-; --- Helper: Convert ASCII string to integer ---
-ascii_to_int:
-    xor rax, rax                ; Result = 0
-.next_digit:
-    movzx rbx, byte [rsi]
-    cmp rbx, 10                 ; Stop at newline
-    je .done
-    cmp rbx, '0'
-    jl .done
-    cmp rbx, '9'
-    jg .done
-    sub rbx, '0'
-    imul rax, 10
-    add rax, rbx
-    inc rsi
-    jmp .next_digit
-.done:
     ret
