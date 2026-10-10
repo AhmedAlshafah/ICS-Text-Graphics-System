@@ -1,78 +1,108 @@
 section .data
-    rect_prompt db "Enter rectangle size (1-9): ", 0
-    rect_prompt_len equ $ - rect_prompt
-    rect_star db "* ", 0
-    rect_newline db 10, 0
+    rect_width_prompt   db "Enter rectangle width (1-9): "
+    rect_width_len      equ $ - rect_width_prompt
+    
+    rect_height_prompt  db "Enter rectangle height (1-9): "
+    rect_height_len     equ $ - rect_height_prompt
+    
+    rect_invalid_msg    db "Invalid input! Please enter a number between 1 and 9.", 10
+    rect_invalid_len    equ $ - rect_invalid_msg
+    
+    rect_star           db "* "            
+    rect_star_len       equ $ - rect_star
+    
+    rect_newline        db 10
+    rect_nl_len         equ $ - rect_newline
 
 section .bss
-    rect_input resb 2
+    rect_input     resb 256          
+    rect_width     resq 1            
+    rect_height    resq 1            
 
 section .text
     global rectangle
     extern main_menu
 
 rectangle:
-    ; --- 1. Prompt User for Size ---
+    ; --- Prompt and get Width ---
     mov rax, 1
     mov rdi, 1
-    mov rsi, rect_prompt
-    mov rdx, rect_prompt_len
+    mov rsi, rect_width_prompt
+    mov rdx, rect_width_len
     syscall
+    call rect_get_valid_input
+    mov [rect_width], rax
 
-    ; --- 2. Read User Input ---
-    mov rax, 0
-    mov rdi, 0
-    mov rsi, rect_input
-    mov rdx, 2
+    ; --- Prompt and get Height ---
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, rect_height_prompt
+    mov rdx, rect_height_len
     syscall
+    call rect_get_valid_input
+    mov [rect_height], rax
 
-    ; --- 3. Convert ASCII to Integer ---
-    movzx r10, byte [rect_input]
-    sub r10, '0'
-
-    cmp r10, 0
-    jle return_to_main
-
-    mov r12, r10        ; r12 = row counter (safe from syscall)
+    ; --- Outer Loop (Rows / Height) ---
+    mov rcx, [rect_height]
 
 rect_row_loop:
-    cmp r12, 0
-    jle return_to_main
+    push rcx                
 
-    mov r13, 0          ; r13 = column counter (safe from syscall)
+    ; --- Inner Loop (Columns / Width) ---
+    mov rcx, [rect_width]
 
 rect_col_loop:
-    cmp r13, r10        ; print r10 columns per row
-    jge rect_next_row
+    push rcx                
 
-    call rect_print_star
-    inc r13
-    jmp rect_col_loop
-
-rect_next_row:
-    call rect_print_newline
-    dec r12
-    jmp rect_row_loop
-
-return_to_main:
-    jmp main_menu
-
-; ===================================================
-; Helper Subroutines
-; ===================================================
-
-rect_print_star:
+    ; Print "* "
     mov rax, 1
     mov rdi, 1
     mov rsi, rect_star
-    mov rdx, 2
+    mov rdx, 2              
     syscall
-    ret
 
-rect_print_newline:
+    pop rcx
+    loop rect_col_loop
+
+    ; Print Newline after each row
     mov rax, 1
     mov rdi, 1
     mov rsi, rect_newline
     mov rdx, 1
     syscall
+
+    pop rcx
+    loop rect_row_loop
+
+rect_return_to_main:        
+    jmp main_menu           
+
+; Function to read and validate a number between 1 and 9
+rect_get_valid_input:
+    mov rax, 0              
+    mov rdi, 0              
+    mov rsi, rect_input
+    mov rdx, 256            
+    syscall
+
+    cmp rax, 2
+    jne rect_input_error
+
+    movzx rbx, byte [rect_input]
+    cmp rbx, '1'
+    jl rect_input_error
+    cmp rbx, '9'
+    jg rect_input_error
+
+    sub rbx, '0'
+    mov rax, rbx
     ret
+
+rect_input_error:
+    mov rax, 1              
+    mov rdi, 1              
+    mov rsi, rect_invalid_msg
+    mov rdx, rect_invalid_len
+    syscall
+    jmp rect_get_valid_input
+
