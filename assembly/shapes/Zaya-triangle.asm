@@ -254,7 +254,6 @@ render_triangle:
     cmp byte [is_hollow], 1
     je .render_hollow_row
 
-    ; --- FILLED TRIANGLE LOGIC ---
     ; Characters count = 2 * row - 1
     mov rcx, r13
     shl rcx, 1
