@@ -228,10 +228,6 @@ read_input:
 .done:
     	ret
 
-
-; ==========================================
-; 5. Triangle Generation & Rendering Engine
-; ==========================================
 render_triangle:
     mov r13, 1              ; r13 = current row (1 to height)
     mov r12, [height]       ; r12 = total height
@@ -271,7 +267,6 @@ render_triangle:
     jnz .fill_solid
     jmp .print_row
 
-    ; --- HOLLOW TRIANGLE LOGIC ---
 .render_hollow_row:
     ; Row 1 or Last Row are always fully printed
     cmp r13, 1
