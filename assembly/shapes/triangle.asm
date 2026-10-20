@@ -46,10 +46,7 @@ section .bss
     triangle_color_len   resq 1      ; Length of selected color string
     triangle_line_buffer resb 100    ; Line construction buffer
 
-section .text
-    global _start
-
-_start:
+_triangle:
     call triangle_get_height
     call triangle_get_style
     call triangle_get_char
