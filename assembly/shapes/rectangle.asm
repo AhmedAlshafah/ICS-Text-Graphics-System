@@ -33,9 +33,11 @@ section .bss
     rect_style          resq 1
 
 section .text
+    global rectangle
     global draw_rectangle
     extern main_menu
 
+rectangle:
 draw_rectangle:
     ; --- Prompt Width ---
     mov rax, 1
