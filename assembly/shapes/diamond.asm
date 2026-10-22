@@ -1,193 +1,319 @@
-; ==========================================
-; Shape: Diamond
-; Developer: Arko
-; Parameter: size
-; ==========================================
-
 section .data
-    arko_prompt db "Enter diamond size (1-9): "
-    arko_prompt_len equ $ - arko_prompt
-    arko_star db "* "
+    arko_p_size db 10, "Enter diamond size (2-9): ", 0
+    arko_l_size equ $ - arko_p_size
+    arko_p_qty db "Enter quantity (1-9): ", 0
+    arko_l_qty equ $ - arko_p_qty
+    arko_p_mode db "Mode (1=Filled, 2=Hollow): ", 0
+    arko_l_mode equ $ - arko_p_mode
+    arko_p_char db "Character (1=Asterisk *, 2=Hash #): ", 0
+    arko_l_char equ $ - arko_p_char
+    arko_p_color db "Color (1=Red, 2=Green, 3=Blue, 4=Default): ", 0
+    arko_l_color equ $ - arko_p_color
+    arko_err_msg db "Invalid input! Please enter a valid digit.", 10, 0
+    arko_err_len equ $ - arko_err_msg
+
+    arko_col_red db 27, "[31m"
+    arko_col_green db 27, "[32m"
+    arko_col_blue db 27, "[34m"
+    arko_col_reset db 27, "[0m"
+
+    arko_symbol db "* "         
     arko_space db "  "
     arko_newline db 10
-    arko_invalid_msg db "Invalid size. Enter a number from 1 to 9.", 10
-    arko_invalid_len equ $ - arko_invalid_msg
 
 section .bss
-    arko_param resb 2
+    arko_input resb 2          
+    arko_temp resb 1           
+    arko_size resb 1           
+    arko_qty resb 1
+    arko_mode resb 1
+    arko_color resb 1
 
 section .text
-global diamond
 
-diamond:
-    ; --- Prompt for size ---
-arko_prompt_size:
+; Entry point called by Ahmed's main.asm
+diamond:                         
+ask_size:
     mov rax, 1
     mov rdi, 1
-    mov rsi, arko_prompt
-    mov rdx, arko_prompt_len
+    mov rsi, arko_p_size
+    mov rdx, arko_l_size
     syscall
+    call arko_read_and_flush
+    cmp al, '2'
+    jl .err
+    cmp al, '9'
+    jg .err
+    sub al, '0'
+    mov [arko_size], al
+    jmp ask_qty
+.err:
+    call arko_print_error
+    jmp ask_size
 
-    ; --- Prepare to read input ---
-arko_read_input:
-    xor r8, r8
-    xor r10, r10
-
-    ; --- Read one character at a time ---
-arko_read_char:
-    mov rax, 0
-    mov rdi, 0
-    mov rsi, arko_param
-    mov rdx, 1
-    syscall
-
-    cmp rax, 1
-    jne exit_program
-
-    mov al, [arko_param]
-
-    ; Check for Enter
-    cmp al, 10
-    je arko_validate
-
-    ; Count characters
-    inc r8
-
-    ; Save only the first character
-    cmp r8, 1
-    jne arko_read_char
-
-    mov r10b, al
-    jmp arko_read_char
-
-    ; --- Validate input ---
-arko_validate:
-    cmp r8, 1
-    jne arko_invalid
-
-    cmp r10b, '1'
-    jb arko_invalid
-
-    cmp r10b, '9'
-    ja arko_invalid
-
-    ; Convert ASCII to integer
-    sub r10, '0'
-    jmp arko_start_drawing
-
-    ; --- Invalid input ---
-arko_invalid:
+ask_qty:
     mov rax, 1
     mov rdi, 1
-    mov rsi, arko_invalid_msg
-    mov rdx, arko_invalid_len
+    mov rsi, arko_p_qty
+    mov rdx, arko_l_qty
     syscall
+    call arko_read_and_flush
+    cmp al, '1'
+    jl .err
+    cmp al, '9'
+    jg .err
+    sub al, '0'
+    mov [arko_qty], al
+    jmp ask_mode
+.err:
+    call arko_print_error
+    jmp ask_qty
 
-    jmp arko_prompt_size
+ask_mode:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, arko_p_mode
+    mov rdx, arko_l_mode
+    syscall
+    call arko_read_and_flush
+    cmp al, '1'
+    jl .err
+    cmp al, '2'
+    jg .err
+    mov [arko_mode], al
+    jmp ask_char
+.err:
+    call arko_print_error
+    jmp ask_mode
 
-    ; --- Start drawing diamond ---
-arko_start_drawing:
-    mov r8, 1
+ask_char:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, arko_p_char
+    mov rdx, arko_l_char
+    syscall
+    call arko_read_and_flush
+    cmp al, '1'
+    je .set_ast
+    cmp al, '2'
+    je .set_hash
+    call arko_print_error
+    jmp ask_char
+.set_ast:
+    mov byte [arko_symbol], '*'   
+    jmp ask_color
+.set_hash:
+    mov byte [arko_symbol], '#'   
+    jmp ask_color
 
-    ; --- Top Half ---              
+ask_color:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, arko_p_color
+    mov rdx, arko_l_color
+    syscall
+    call arko_read_and_flush
+    cmp al, '1'
+    jl .err
+    cmp al, '4'
+    jg .err
+    mov [arko_color], al
+    call arko_apply_color
+    jmp start_drawing
+.err:
+    call arko_print_error
+    jmp ask_color
+
+start_drawing:
+    movzx r10, byte [arko_size]   
+    movzx r12, byte [arko_qty]    
+    mov r8, 1                     
+
+qty_loop:
+    cmp r8, r12
+    jg return_to_main
+    mov r13, 1                    
 dia_top_row:
-    cmp r8, r10             
+    cmp r13, r10             
     jg dia_bot_init         
-    
     mov r9, r10
-    sub r9, r8              
-    mov r11, 0              
-dia_top_space:
-    cmp r11, r9
-    jge dia_top_stars
+    sub r9, r13                  
+    mov r14, 0              
+.space_loop:
+    cmp r14, r9
+    jge .stars_init
     call arko_print_space
-    inc r11
-    jmp dia_top_space
-
-dia_top_stars:
-    mov r9, r8
-    add r9, r8
-    dec r9                  
-    mov r11, 0              
-dia_top_star_loop:
-    cmp r11, r9
-    jge dia_top_next_row
-    call arko_print_star
-    inc r11
-    jmp dia_top_star_loop
-
-dia_top_next_row:
+    inc r14
+    jmp .space_loop
+.stars_init:
+    mov r15, r13
+    add r15, r13
+    dec r15                       
+    cmp byte [arko_mode], '2'     
+    je .draw_hollow
+.draw_filled:
+    mov r14, 0              
+.f_loop:
+    cmp r14, r15
+    jge .row_done
+    call arko_print_symbol
+    inc r14
+    jmp .f_loop
+.draw_hollow:
+    call arko_print_symbol        
+    cmp r15, 1
+    je .row_done                  
+    mov r14, 0
+    mov r9, r15
+    sub r9, 2                     
+.h_space_loop:
+    cmp r14, r9
+    jge .h_last_star
+    call arko_print_space
+    inc r14
+    jmp .h_space_loop
+.h_last_star:
+    call arko_print_symbol        
+.row_done:
     call arko_print_newline
-    inc r8                  
+    inc r13                  
     jmp dia_top_row
 
-    ; --- Bottom Half ---
 dia_bot_init:
-    mov r8, r10
-    dec r8                  
+    mov r13, r10
+    dec r13                       
 dia_bot_row:
-    cmp r8, 0
-    jle return_to_main      
-    
+    cmp r13, 0
+    jle qty_next      
     mov r9, r10
-    sub r9, r8 
-    mov r11, 0 
-dia_bot_space:
-    cmp r11, r9
-    jge dia_bot_stars
+    sub r9, r13 
+    mov r14, 0 
+.space_loop:
+    cmp r14, r9
+    jge .stars_init
     call arko_print_space
-    inc r11
-    jmp dia_bot_space
-
-dia_bot_stars:
-    mov r9, r8
-    add r9, r8
-    dec r9
-    mov r11, 0
-dia_bot_star_loop:
-    cmp r11, r9
-    jge dia_bot_next_row
-    call arko_print_star
-    inc r11
-    jmp dia_bot_star_loop
-
-dia_bot_next_row:
+    inc r14
+    jmp .space_loop
+.stars_init:
+    mov r15, r13
+    add r15, r13
+    dec r15                       
+    cmp byte [arko_mode], '2'
+    je .draw_hollow
+.draw_filled:
+    mov r14, 0
+.f_loop:
+    cmp r14, r15
+    jge .row_done
+    call arko_print_symbol
+    inc r14
+    jmp .f_loop
+.draw_hollow:
+    call arko_print_symbol          
+    cmp r15, 1
+    je .row_done                  
+    mov r14, 0
+    mov r9, r15
+    sub r9, 2                     
+.h_space_loop:
+    cmp r14, r9
+    jge .h_last_star
+    call arko_print_space
+    inc r14
+    jmp .h_space_loop
+.h_last_star:
+    call arko_print_symbol          
+.row_done:
     call arko_print_newline
-    dec r8                  
+    dec r13                  
     jmp dia_bot_row
 
-return_to_main:
-    jmp main_menu           ; Return control to Ahmed's main menu without closing
+qty_next:
+    call arko_print_newline       
+    inc r8
+    jmp qty_loop
 
-; ==========================================
-; Local Helper Subroutines
-; ==========================================
-arko_print_star:
-    push r11
+return_to_main:
+    ; Reset color back to default before exiting your shape
     mov rax, 1
     mov rdi, 1
-    mov rsi, arko_star
+    mov rsi, arko_col_reset
+    mov rdx, 5
+    syscall
+
+    ; Safely jump back to Ahmed's main menu
+    jmp main_menu           
+
+arko_read_and_flush:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, arko_input
+    mov rdx, 2
+    syscall
+    mov al, byte [arko_input]       
+    mov ah, byte [arko_input + 1]   
+    cmp ah, 10                      
+    je flush_done
+flush_loop:
+    mov rax, 0
+    mov rdi, 0
+    mov rsi, arko_temp
     mov rdx, 1
     syscall
-    pop r11
+    cmp byte [arko_temp], 10
+    jne flush_loop
+flush_done:
     ret
 
+arko_apply_color:
+    mov al, [arko_color]
+    cmp al, '1'
+    je .red
+    cmp al, '2'
+    je .green
+    cmp al, '3'
+    je .blue
+    ret 
+.red:
+    mov rsi, arko_col_red
+    jmp .print_col
+.green:
+    mov rsi, arko_col_green
+    jmp .print_col
+.blue:
+    mov rsi, arko_col_blue
+.print_col:
+    mov rax, 1
+    mov rdi, 1
+    mov rdx, 5
+    syscall
+    ret
+
+arko_print_error:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, arko_err_msg
+    mov rdx, arko_err_len
+    syscall
+    ret
+arko_print_symbol:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, arko_symbol
+    mov rdx, 2
+    syscall
+    ret
 arko_print_space:
-    push r11
     mov rax, 1
     mov rdi, 1
     mov rsi, arko_space
-    mov rdx, 1
+    mov rdx, 2
     syscall
-    pop r11
     ret
-
 arko_print_newline:
-    push r11
     mov rax, 1
     mov rdi, 1
     mov rsi, arko_newline
     mov rdx, 1
     syscall
-    pop r11
     ret
