@@ -42,7 +42,9 @@ section .bss
 	triangle_color_ptr   resq 1
 	triangle_color_len   resq 1
 	triangle_line_buffer resb 100
+section .text
 
+triangle:
 _triangle:
 	call triangle_get_height
 	call triangle_get_style
@@ -50,9 +52,7 @@ _triangle:
 	call triangle_get_color
 	call triangle_render
 
-	mov rax, 60
-	xor rdi, rdi
-	syscall
+	jmp main_menu
 
 triangle_get_height:
 	mov rax, 1
