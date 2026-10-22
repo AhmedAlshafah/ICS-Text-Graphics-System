@@ -54,3 +54,18 @@ All shapes will later be integrated into one common program.
 Do not develop directly on the `main` branch.
 
 Each member will work on their own branch first. Code will be tested before it is merged into `main`.
+
+
+
+## How to Run
+
+Assembly version
+
+nasm -f elf64 assembly/main.asm -o assembly/main.o
+ld assembly/main.o -o assembly/main
+./assembly/main
+
+
+Python version
+
+python3 python/main.py
