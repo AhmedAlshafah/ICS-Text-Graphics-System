@@ -62,7 +62,9 @@ Each member will work on their own branch first. Code will be tested before it i
 Assembly version
 
 nasm -f elf64 assembly/main.asm -o assembly/main.o
+
 ld assembly/main.o -o assembly/main
+
 ./assembly/main
 
 
