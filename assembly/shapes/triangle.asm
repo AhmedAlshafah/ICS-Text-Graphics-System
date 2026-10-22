@@ -1,208 +1,343 @@
-; ==========================================
-; Shape: Triangle
-; Original Developer: Zaya
-; Integration: Ahmed
-; Parameter: Height (1-9)
-; ==========================================
+default rel
 
 section .data
+	triangle_prompt_height db "Enter triangle height (1-9): "
+	triangle_prompt_height_len equ $ - triangle_prompt_height
 
-    zaya_prompt db "Enter triangle height (1-9): "
-    zaya_prompt_len equ $ - zaya_prompt
+	triangle_prompt_style db "Select style - [F]illed or [H]ollow: "
+	triangle_prompt_style_len equ $ - triangle_prompt_style
 
-    zaya_invalid_msg db "Invalid height. Enter a number from 1 to 9.", 10
-    zaya_invalid_len equ $ - zaya_invalid_msg
+	triangle_prompt_char db "Enter character to draw (e.g., *, #, @): "
+	triangle_prompt_char_len equ $ - triangle_prompt_char
 
+	triangle_prompt_color db "Select color [1-Red, 2-Green, 3-Yellow, 4-Blue, 5-Magenta, 6-Cyan]: "
+	triangle_prompt_color_len equ $ - triangle_prompt_color
+
+	triangle_err_height db "Invalid height. Enter a number from 1 to 9.", 10
+	triangle_err_height_len equ $ - triangle_err_height
+
+	triangle_err_style db "Invalid style. Enter 'F' or 'H'.", 10
+	triangle_err_style_len equ $ - triangle_err_style
+
+	triangle_err_color db "Invalid color option. Enter 1 to 6.", 10
+	triangle_err_color_len equ $ - triangle_err_color
+
+	triangle_newline db 10, 0
+
+	triangle_color_reset  db 27, "[0m", 0
+	triangle_color_reset_len equ 4
+
+	triangle_col_red      db 27, "[31m", 0
+	triangle_col_green    db 27, "[32m", 0
+	triangle_col_yellow   db 27, "[33m", 0
+	triangle_col_blue     db 27, "[34m", 0
+	triangle_col_magenta  db 27, "[35m", 0
+	triangle_col_cyan     db 27, "[36m", 0
 
 section .bss
-
-    zaya_input resb 1
-    zaya_line resb 20
-
-
+	triangle_input_buf    resb 10
+	triangle_height        resq 1
+	triangle_is_hollow   resb 1
+	triangle_draw_char   resb 1
+	triangle_color_ptr   resq 1
+	triangle_color_len   resq 1
+	triangle_line_buffer resb 100
 section .text
 
 triangle:
+_triangle:
+	call triangle_get_height
+	call triangle_get_style
+	call triangle_get_char
+	call triangle_get_color
+	call triangle_render
 
-    ; ======================================
-    ; Ask user for triangle height
-    ; ======================================
+	jmp main_menu
 
-zaya_prompt_size:
+triangle_get_height:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_prompt_height
+	mov rdx, triangle_prompt_height_len
+	syscall
 
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, zaya_prompt
-    mov rdx, zaya_prompt_len
-    syscall
+	call triangle_read_input
 
-    xor r8, r8
-    xor r10, r10
+	cmp r8, 1
+	jne triangle_invalid_height_err
+	mov al, [triangle_input_buf]
+	cmp al, '1'
+	jb triangle_invalid_height_err
+	cmp al, '9'
+	ja triangle_invalid_height_err
 
+	sub al, '0'
+	movzx rax, al
+	mov [triangle_height], rax
+	ret
 
-    ; ======================================
-    ; Read input one character at a time
-    ; ======================================
+triangle_invalid_height_err:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_err_height
+	mov rdx, triangle_err_height_len
+	syscall
+	jmp triangle_get_height
 
-zaya_read_char:
+triangle_get_style:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_prompt_style
+	mov rdx, triangle_prompt_style_len
+	syscall
 
-    mov rax, 0
-    mov rdi, 0
-    mov rsi, zaya_input
-    mov rdx, 1
-    syscall
+	call triangle_read_input
+	cmp r8, 1
+	jne triangle_invalid_style_err
 
-    cmp rax, 1
-    jne exit_program
+	mov al, [triangle_input_buf]
+	cmp al, 'f'
+	je .set_filled
+	cmp al, 'F'
+	je .set_filled
+	cmp al, 'h'
+	je .set_hollow
+	cmp al, 'H'
+	je .set_hollow
+	jmp triangle_invalid_style_err
 
-    mov al, [zaya_input]
+.set_filled:
+	mov byte [triangle_is_hollow], 0
+	ret
 
-    ; Check whether Enter was pressed
-    cmp al, 10
-    je zaya_validate
+.set_hollow:
+	mov byte [triangle_is_hollow], 1
+	ret
 
-    ; Count characters entered
-    inc r8
+triangle_invalid_style_err:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_err_style
+	mov rdx, triangle_err_style_len
+	syscall
+	jmp triangle_get_style
 
-    ; Save only the first character
-    cmp r8, 1
-    jne zaya_read_char
+triangle_get_char:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_prompt_char
+	mov rdx, triangle_prompt_char_len
+	syscall
 
-    mov r10b, al
-    jmp zaya_read_char
+	call triangle_read_input
+	cmp r8, 1
+	jl triangle_get_char
 
+	mov al, [triangle_input_buf]
+	mov [triangle_draw_char], al
+	ret
 
-    ; ======================================
-    ; Validate height (1-9)
-    ; ======================================
+triangle_get_color:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_prompt_color
+	mov rdx, triangle_prompt_color_len
+	syscall
 
-zaya_validate:
+	call triangle_read_input
+	cmp r8, 1
+	jne triangle_invalid_color_err
 
-    ; Input must contain exactly one character
-    cmp r8, 1
-    jne zaya_invalid
+	mov al, [triangle_input_buf]
+	sub al, '0'
 
-    ; Reject characters below '1'
-    cmp r10b, '1'
-    jb zaya_invalid
+	cmp al, 1
+	je .c_red
+	cmp al, 2
+	je .c_green
+	cmp al, 3
+	je .c_yellow
+	cmp al, 4
+	je .c_blue
+	cmp al, 5
+	je .c_magenta
+	cmp al, 6
+	je .c_cyan
+	jmp triangle_invalid_color_err
 
-    ; Reject characters above '9'
-    cmp r10b, '9'
-    ja zaya_invalid
+.c_red:
+	mov qword [triangle_color_ptr], triangle_col_red
+	mov qword [triangle_color_len], 5
+	ret
 
-    ; Convert ASCII character into integer
-    movzx r12, r10b
-    sub r12, '0'
+.c_green:
+	mov qword [triangle_color_ptr], triangle_col_green
+	mov qword [triangle_color_len], 5
+	ret
 
-    ; Start from row 1
-    mov r13, 1
+.c_yellow:
+	mov qword [triangle_color_ptr], triangle_col_yellow
+	mov qword [triangle_color_len], 5
+	ret
 
-    jmp zaya_row_loop
+.c_blue:
+	mov qword [triangle_color_ptr], triangle_col_blue
+	mov qword [triangle_color_len], 5
+	ret
 
+.c_magenta:
+	mov qword [triangle_color_ptr], triangle_col_magenta
+	mov qword [triangle_color_len], 5
+	ret
 
-    ; ======================================
-    ; Handle invalid input
-    ; ======================================
+.c_cyan:
+	mov qword [triangle_color_ptr], triangle_col_cyan
+	mov qword [triangle_color_len], 5
+	ret
 
-zaya_invalid:
+triangle_invalid_color_err:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_err_color
+	mov rdx, triangle_err_color_len
+	syscall
+	jmp triangle_get_color
 
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, zaya_invalid_msg
-    mov rdx, zaya_invalid_len
-    syscall
+triangle_read_input:
+	mov rax, 0
+	mov rdi, 0
+	mov rsi, triangle_input_buf
+	mov rdx, 10
+	syscall
 
-    jmp zaya_prompt_size
+	xor r8, r8
+.count_loop:
+	mov al, [triangle_input_buf + r8]
+	cmp al, 10
+	je .done
+	cmp al, 0
+	je .done
+	inc r8
+	cmp r8, 9
+	jl .count_loop
 
+.done:
+	ret
 
-    ; ======================================
-    ; Generate triangle rows
-    ; ======================================
+triangle_render:
+	mov r13, 1
+	mov r12, [triangle_height]
 
-zaya_row_loop:
+.row_loop:
+	cmp r13, r12
+	jg .done_rendering
 
-    ; Check if all rows are completed
-    cmp r13, r12
-    jg zaya_done
+	lea rdi, [rel triangle_line_buffer]
 
-    ; Point to the beginning of line buffer
-    lea rdi, [rel zaya_line]
+	mov rcx, r12
+	sub rcx, r13
+	jz .prepare_chars
 
-    ; Calculate spaces = height - current row
-    mov rcx, r12
-    sub rcx, r13
+.fill_spaces:
+	mov byte [rdi], ' '
+	inc rdi
+	dec rcx
+	jnz .fill_spaces
 
-    ; Skip spaces if count is zero
-    jz zaya_prepare_stars
+.prepare_chars:
+	cmp byte [triangle_is_hollow], 1
+	je .render_hollow_row
 
+	mov rcx, r13
+	shl rcx, 1
+	dec rcx
+	mov al, [triangle_draw_char]
 
-    ; ======================================
-    ; Fill spaces
-    ; ======================================
+.fill_solid:
+	mov [rdi], al
+	inc rdi
+	dec rcx
+	jnz .fill_solid
+	jmp .print_row
 
-zaya_fill_spaces:
+.render_hollow_row:
+	cmp r13, 1
+	je .hollow_top_or_bottom
+	cmp r13, r12
+	je .hollow_top_or_bottom
 
-    mov byte [rdi], ' '
-    inc rdi
+	mov al, [triangle_draw_char]
+	mov [rdi], al
+	inc rdi
 
-    dec rcx
-    jnz zaya_fill_spaces
+	mov rcx, r13
+	shl rcx, 1
+	sub rcx, 3
 
+.fill_inner_spaces:
+	mov byte [rdi], ' '
+	inc rdi
+	dec rcx
+	jnz .fill_inner_spaces
 
-    ; ======================================
-    ; Calculate stars = 2 * row - 1
-    ; ======================================
+	mov al, [triangle_draw_char]
+	mov [rdi], al
+	inc rdi
+	jmp .print_row
 
-zaya_prepare_stars:
+.hollow_top_or_bottom:
+	mov rcx, r13
+	shl rcx, 1
+	dec rcx
+	mov al, [triangle_draw_char]
 
-    mov rcx, r13
-    shl rcx, 1
-    dec rcx
+.fill_hollow_solid:
+	mov [rdi], al
+	inc rdi
+	dec rcx
+	jnz .fill_hollow_solid
 
+.print_row:
+	mov byte [rdi], 10
+	inc rdi
 
-    ; ======================================
-    ; Fill stars
-    ; ======================================
+	push rdi
+	push r12
+	push r13
 
-zaya_fill_stars:
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, [triangle_color_ptr]
+	mov rdx, [triangle_color_len]
+	syscall
 
-    mov byte [rdi], '*'
-    inc rdi
+	pop r13
+	pop r12
+	pop rdi
 
-    dec rcx
-    jnz zaya_fill_stars
+	mov rdx, rdi
+	lea rsi, [rel triangle_line_buffer]
+	sub rdx, rsi
 
+	push rdi
+	push r12
+	push r13
+	mov rax, 1
+	mov rdi, 1
+	syscall
 
-    ; ======================================
-    ; Add newline
-    ; ======================================
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, triangle_color_reset
+	mov rdx, triangle_color_reset_len
+	syscall
 
-    mov byte [rdi], 10
-    inc rdi
+	pop r13
+	pop r12
+	pop rdi
 
+	inc r13
+	jmp .row_loop
 
-    ; ======================================
-    ; Calculate line length and print
-    ; ======================================
-
-    mov rdx, rdi
-    lea rsi, [rel zaya_line]
-    sub rdx, rsi
-
-    mov rax, 1
-    mov rdi, 1
-    syscall
-
-    ; Move to next row
-    inc r13
-
-    jmp zaya_row_loop
-
-
-    ; ======================================
-    ; Return to main menu
-    ; ======================================
-
-zaya_done:
-
-    jmp main_menu
+.done_rendering:
+	ret
